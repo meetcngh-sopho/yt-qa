@@ -1,0 +1,8 @@
+﻿fastapi
+uvicorn
+openai
+chromadb
+youtube-transcript-api
+yt-dlp
+faster-whisper
+python-multipart

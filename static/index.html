@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Q&A</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        /* ── Top bar ── */
+        .topbar {
+            background: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .topbar h1 { font-size: 20px; font-weight: 700; color: #ff4444; }
+        .topbar .sub { font-size: 12px; color: #555; margin-left: 4px; }
+
+        /* ── Layout ── */
+        .layout {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            height: calc(100vh - 53px);
+        }
+
+        /* LEFT */
+        .left {
+            border-right: 1px solid #2a2a2a;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .left-inner {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .left-inner::-webkit-scrollbar       { width: 4px; }
+        .left-inner::-webkit-scrollbar-track { background: #0f0f0f; }
+        .left-inner::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+        /* RIGHT */
+        .right {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Cards ── */
+        .card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .card-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #555;
+            margin-bottom: 12px;
+        }
+
+        /* ── Input ── */
+        .input-row { display: flex; gap: 8px; }
+
+        input[type="text"] {
+            flex: 1;
+            background: #111;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #e0e0e0;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+            min-width: 0;
+        }
+
+        input[type="text"]:focus { border-color: #ff4444; }
+        input[type="text"]::placeholder { color: #444; }
+
+        button {
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        button:hover    { background: #cc3333; }
+        button:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+        /* ── Status ── */
+        .status {
+            font-size: 12px;
+            margin-top: 10px;
+            min-height: 18px;
+            color: #666;
+        }
+
+        .status.ok   { color: #4caf50; }
+        .status.err  { color: #ff5555; }
+        .status.load { color: #ffa500; }
+
+        /* ── Video items ── */
+        #videos-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .video-item {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            background: #111;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+
+        .video-item:hover  { border-color: #555; }
+        .video-item.active { border-color: #ff4444; background: #1f1010; }
+
+        .video-item img {
+            width: 100px;
+            height: 60px;
+            border-radius: 5px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: #222;
+        }
+
+        .video-item-info { flex: 1; min-width: 0; }
+
+        .video-item-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #ddd;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .video-item-meta {
+            font-size: 11px;
+            color: #555;
+            margin-top: 5px;
+        }
+
+        .delete-btn {
+            background: transparent;
+            border: none;
+            color: #444;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            line-height: 1;
+            transition: color 0.15s;
+        }
+
+        .delete-btn:hover { color: #ff4444; background: transparent; }
+
+        /* ── Right panel ── */
+        .no-video {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            gap: 12px;
+        }
+
+        .no-video .icon { font-size: 48px; }
+        .no-video p { font-size: 14px; }
+
+        /* ── Chat header ── */
+        .chat-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .chat-header img {
+            width: 64px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+            background: #222;
+            flex-shrink: 0;
+        }
+
+        .chat-header-info { flex: 1; min-width: 0; }
+        .chat-header-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+        .chat-header-title { font-size: 14px; font-weight: 600; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .clear-btn {
+            background: transparent;
+            color: #555;
+            border: 1px solid #2a2a2a;
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+
+        .clear-btn:hover { color: #ff4444; border-color: #ff4444; background: transparent; }
+
+        /* ── Chat messages ── */
+        #chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        #chat-box::-webkit-scrollbar       { width: 4px; }
+        #chat-box::-webkit-scrollbar-track { background: #0f0f0f; }
+        #chat-box::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+
+        .chat-msg { display: flex; flex-direction: column; gap: 4px; }
+
+        .chat-msg { display: flex; flex-direction: column; gap: 4px; }
+
+        .chat-msg.user .bubble {
+            background: #1a1a3a;
+            border: 1px solid #2a2a5a;
+            color: #b0baff;
+            align-self: flex-end;
+        }
+
+        .chat-msg.assistant .bubble {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            color: #e0e0e0;
+            align-self: flex-start;
+        }
+
+        .bubble {
+            max-width: 75%;
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 14px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            position: relative;
+        }
+
+        .chat-meta { font-size: 11px; color: #444; padding: 0 4px; }
+        .chat-msg.user      .chat-meta { align-self: flex-end; }
+        .chat-msg.assistant .chat-meta { align-self: flex-start; }
+
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #2a2a2a;
+            color: #888;
+            border: none;
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .bubble:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { background: #333; color: #fff; }
+
+        /* ── Chat input ── */
+        .chat-input-bar {
+            padding: 12px 16px;
+            border-top: 1px solid #2a2a2a;
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        /* ── Typing dots ── */
+        .dot {
+            width: 7px; height: 7px;
+            background: #555;
+            border-radius: 50%;
+            display: inline-block;
+            animation: bounce 1.2s infinite;
+        }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: translateY(0); background: #555; }
+            40%            { transform: translateY(-5px); background: #ff4444; }
+        }
+
+        .empty-state { color: #333; font-style: italic; font-size: 13px; text-align: center; padding: 20px 0; }
+
+        .spinner {
+            display: inline-block;
+            width: 12px; height: 12px;
+            border: 2px solid #333;
+            border-top-color: #ff4444;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Mobile ── */
+        @media (max-width: 700px) {
+            .layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+                height: auto;
+                min-height: calc(100vh - 53px);
+            }
+
+            .left {
+                border-right: none;
+                border-bottom: 1px solid #2a2a2a;
+                max-height: 40vh;
+            }
+
+            .right {
+                height: calc(60vh - 53px);
+                min-height: 400px;
+            }
+
+            .bubble { max-width: 95%; }
+
+            .video-item img { width: 80px; height: 50px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+    <h1>▶ YouTube Q&A</h1>
+    <span class="sub">Ask anything about any video</span>
+</div>
+
+<div class="layout">
+
+    <!-- LEFT PANEL -->
+    <div class="left">
+        <div class="left-inner">
+
+            <!-- Load -->
+            <div class="card">
+                <div class="card-title">Load Video</div>
+                <div class="input-row">
+                    <input type="text" id="url-input" placeholder="Paste YouTube URL..." />
+                    <button id="load-btn" onclick="loadVideo()">Load</button>
+                </div>
+                <div class="status" id="load-status"></div>
+            </div>
+
+            <!-- Video list -->
+            <div class="card" style="flex:1">
+                <div class="card-title" style="display:flex;justify-content:space-between">
+                    <span>Saved Videos</span>
+                    <span id="video-count" style="color:#555;font-weight:400;font-size:11px;"></span>
+                </div>
+                <div id="videos-list">
+                    <div class="empty-state">No videos loaded yet</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right" id="right-panel">
+
+        <!-- Placeholder -->
+        <div class="no-video" id="no-video">
+            <div class="icon">▶</div>
+            <p>Select a video to start chatting</p>
+        </div>
+
+        <!-- Chat (hidden until video selected) -->
+        <div id="chat-area" style="display:none; flex-direction:column; height:100%;">
+
+            <!-- Header -->
+            <div class="chat-header">
+                <img id="selected-thumb" src="" alt="" />
+                <div class="chat-header-info">
+                    <div class="chat-header-label">Now watching</div>
+                    <div class="chat-header-title" id="selected-title">—</div>
+                </div>
+                <button class="clear-btn" onclick="clearHistory()">Clear</button>
+            </div>
+
+            <!-- Messages -->
+            <div id="chat-box">
+                <div class="empty-state">Ask a question to start...</div>
+            </div>
+
+            <!-- Input -->
+            <div class="chat-input-bar">
+                <input type="text" id="question-input"
+                       placeholder="Ask anything about this video..."
+                       onkeydown="if(event.key==='Enter') askQuestion()" />
+                <button id="ask-btn" onclick="askQuestion()">Ask</button>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    const API = "http://localhost:8000";
+    let selectedVideoId = null;
+
+    function thumbUrl(id) {
+        return `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+    }
+
+    function nowTime() {
+        return new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+    }
+
+    function escapeHtml(s) {
+        return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    // ── Load video ──────────────────────────────────────────
+    async function loadVideo() {
+        const url = document.getElementById("url-input").value.trim();
+        if (!url) return;
+
+        setStatus("loading", "Loading video...");
+        document.getElementById("load-btn").disabled = true;
+
+        try {
+            const res  = await fetch(`${API}/load`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({url}),
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                setStatus("err", `Error: ${data.detail}`);
+            } else if (data.status === "already_loaded") {
+                setStatus("ok", `Already loaded: "${data.title}"`);
+            } else {
+                setStatus("ok", `✓ "${data.title}" — ${data.chunks} chunks`);
+                document.getElementById("url-input").value = "";
+            }
+            refreshVideos();
+        } catch (e) {
+            setStatus("err", `Cannot connect to API: ${e.message}`);
+        }
+
+        document.getElementById("load-btn").disabled = false;
+    }
+
+    // ── Refresh video list ───────────────────────────────────
+    async function refreshVideos() {
+        try {
+            const res  = await fetch(`${API}/videos`);
+            const data = await res.json();
+            const list  = document.getElementById("videos-list");
+            const count = document.getElementById("video-count");
+
+            count.textContent = data.count > 0 ? `${data.count} video${data.count > 1 ? "s" : ""}` : "";
+
+            if (data.count === 0) {
+                list.innerHTML = '<div class="empty-state">No videos loaded yet</div>';
+                return;
+            }
+
+            list.innerHTML = data.videos.map(v => `
+                <div class="video-item ${v.video_id === selectedVideoId ? "active" : ""}"
+                     onclick="selectVideo('${v.video_id}', \`${v.title.replace(/`/g, "'")}\`)">
+                    <img src="${thumbUrl(v.video_id)}"
+                         onerror="this.src=''"
+                         alt="thumb" />
+                    <div class="video-item-info">
+                        <div class="video-item-title">${escapeHtml(v.title)}</div>
+                        <div class="video-item-meta">${v.chunks} chunks · ${v.method}</div>
+                    </div>
+                    <button class="delete-btn" title="Delete"
+                            onclick="event.stopPropagation(); deleteVideo('${v.video_id}')">✕</button>
+                </div>
+            `).join("");
+        } catch (e) {
+            console.error("refreshVideos failed:", e);
+        }
+    }
+
+    // ── Select video ─────────────────────────────────────────
+    function selectVideo(videoId, title) {
+        selectedVideoId = videoId;
+
+        document.getElementById("no-video").style.display   = "none";
+        const chatArea = document.getElementById("chat-area");
+        chatArea.style.display    = "flex";
+
+        document.getElementById("selected-title").textContent = title;
+        document.getElementById("selected-thumb").src = thumbUrl(videoId);
+        document.getElementById("chat-box").innerHTML = '<div class="empty-state">Ask a question to start...</div>';
+        document.getElementById("question-input").focus();
+
+        refreshVideos();
+    }
+
+    // ── Ask question ─────────────────────────────────────────
+    async function askQuestion() {
+        const question = document.getElementById("question-input").value.trim();
+        if (!question || !selectedVideoId) return;
+
+        const chatBox = document.getElementById("chat-box");
+        document.getElementById("ask-btn").disabled = true;
+        document.getElementById("question-input").value = "";
+
+        const empty = chatBox.querySelector(".empty-state");
+        if (empty) empty.remove();
+
+        const time = nowTime();
+
+        // user bubble
+        const userDiv = document.createElement("div");
+        userDiv.className = "chat-msg user";
+        userDiv.innerHTML = `
+            <div class="chat-meta">${time}</div>
+            <div class="bubble">${escapeHtml(question)}</div>`;
+        chatBox.appendChild(userDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // assistant bubble with typing dots
+        const msgId  = "msg_" + Date.now();
+        const asstDiv = document.createElement("div");
+        asstDiv.className = "chat-msg assistant";
+        asstDiv.id = msgId;
+        asstDiv.innerHTML = `
+            <div class="chat-meta">${time}</div>
+            <div id="${msgId}_dots" style="
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                background: #1a1a1a;
+                border: 1px solid #2a2a2a;
+                border-radius: 12px;
+                padding: 12px 16px;
+                align-self: flex-start;
+                width: fit-content;
+            ">
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </div>
+            <div class="bubble" id="${msgId}_bubble" style="display:none;"></div>`;
+        chatBox.appendChild(asstDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        const bubble = document.getElementById(`${msgId}_bubble`);
+        const dotsEl = document.getElementById(`${msgId}_dots`);
+
+        try {
+            const res = await fetch(`${API}/ask`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({video_id: selectedVideoId, question, k: 4}),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                dotsEl.style.display = "none";
+                bubble.style.display = "";
+                bubble.textContent   = `Error: ${JSON.stringify(err.detail)}`;
+                return;
+            }
+
+            const reader   = res.body.getReader();
+            const decoder  = new TextDecoder();
+            let   fullText = "";
+            let   first    = true;
+
+            while (true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                fullText += decoder.decode(value, {stream: true});
+                if (first) {
+                    dotsEl.style.display = "none";   // hide tiny dots box
+                    bubble.style.display = "";        // show real bubble
+                    first = false;
+                }
+                bubble.textContent = fullText;
+                chatBox.scrollTop  = chatBox.scrollHeight;
+            }
+
+            // copy button after streaming
+            const copyBtn = document.createElement("button");
+            copyBtn.className   = "copy-btn";
+            copyBtn.textContent = "Copy";
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(fullText);
+                copyBtn.textContent = "Copied!";
+                setTimeout(() => copyBtn.textContent = "Copy", 1500);
+            };
+            bubble.appendChild(copyBtn);
+
+        } catch (e) {
+            dotsEl.style.display = "none";
+            bubble.style.display = "";
+            bubble.textContent   = `Failed: ${e.message}`;
+        }
+
+        document.getElementById("ask-btn").disabled = false;
+        document.getElementById("question-input").focus();
+    }
+
+    // ── Delete video ─────────────────────────────────────────
+    async function deleteVideo(videoId) {
+        if (!confirm("Delete this video and its conversation history?")) return;
+
+        await fetch(`${API}/delete/${videoId}`, {method: "DELETE"});
+
+        // if deleted video was selected — reset chat panel
+        if (videoId === selectedVideoId) {
+            selectedVideoId = null;
+            document.getElementById("chat-area").style.display = "none";
+            document.getElementById("no-video").style.display  = "flex";
+        }
+
+        refreshVideos();
+    }
+
+    // ── Clear ────────────────────────────────────────────────
+    async function clearHistory() {
+        if (!selectedVideoId) return;
+        await fetch(`${API}/clear/${selectedVideoId}`, {method: "DELETE"});
+        document.getElementById("chat-box").innerHTML =
+            '<div class="empty-state">Conversation cleared</div>';
+    }
+
+    // ── Status ───────────────────────────────────────────────
+    function setStatus(type, msg) {
+        const el = document.getElementById("load-status");
+        el.className = `status ${type}`;
+        el.innerHTML = type === "loading"
+            ? `<span class="spinner"></span>${msg}`
+            : msg;
+    }
+
+    refreshVideos();
+</script>
+</body>
+</html>
