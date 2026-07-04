@@ -452,7 +452,9 @@
 </div>
 
 <script>
-    const API = "http://localhost:8000";
+    // auto-detect: empty string = same host (works on HF Spaces + Railway)
+    // for local development it falls back to localhost:8000
+    const API = window.location.hostname === "localhost" ? "http://localhost:8000" : "";
     let selectedVideoId = null;
 
     function thumbUrl(id) {
