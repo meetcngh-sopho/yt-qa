@@ -86,14 +86,56 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+class ModelConfig(BaseModel):
+    api_base: str = ""    # empty = use server default
+    api_key:  str = ""    # empty = use server default
+    model:    str = ""    # empty = use server default
+
+
 class LoadRequest(BaseModel):
-    url: str
+    url:    str
+    config: ModelConfig = ModelConfig()
 
 
 class AskRequest(BaseModel):
     video_id: str
     question: str
-    k: int = 4
+    k:        int = 4
+    config:   ModelConfig = ModelConfig()
+
+
+def get_client(config: ModelConfig):
+    # user-provided config takes priority over server defaults
+    base = config.api_base.strip() or (
+        "https://api.groq.com/openai/v1" if DEPLOY_MODE == "railway"
+        else f"{('http://localhost:11434' if os.name == 'nt' else 'http://Jagmeet-singh.local:11434')}/v1"
+    )
+    key = config.api_key.strip() or (GROQ_API_KEY if DEPLOY_MODE == "railway" else "ollama")
+    return OpenAI(base_url=base, api_key=key)
+
+
+def get_model(config: ModelConfig) -> str:
+    return config.model.strip() or MODEL
+
+
+@app.get("/config")
+def get_config():
+    # returns default config so UI can pre-fill the settings form
+    if DEPLOY_MODE == "railway":
+        return {
+            "api_base":    "https://api.groq.com/openai/v1",
+            "model":       "llama-3.3-70b-versatile",
+            "has_api_key": bool(GROQ_API_KEY),
+            "mode":        "railway",
+        }
+    else:
+        base = "http://localhost:11434" if os.name == "nt" else "http://Jagmeet-singh.local:11434"
+        return {
+            "api_base": f"{base}/v1",
+            "model":    "llama3.2:3b",
+            "has_api_key": False,
+            "mode":     "local",
+        }
 
 
 # -------------------------------------------------------
@@ -186,21 +228,21 @@ def chunk_text(text: str, size: int = 500, overlap: int = 50):
     return chunks
 
 
-def embed(text: str):
+def embed(text: str, req_client=None):
     if DEPLOY_MODE == "railway":
         from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-        return model.encode(text[:2000]).tolist()
+        st_model = SentenceTransformer("all-MiniLM-L6-v2")
+        return st_model.encode(text[:2000]).tolist()
     else:
-        r = client.embeddings.create(model="nomic-embed-text", input=text[:2000])
+        c = req_client or client
+        r = c.embeddings.create(model="nomic-embed-text", input=text[:2000])
         return r.data[0].embedding
 
 
-def embed_chunks_parallel(chunks: list, max_workers: int = 4) -> list:
-    # embed all chunks simultaneously instead of one by one
+def embed_chunks_parallel(chunks: list, max_workers: int = 4, req_client=None) -> list:
     results = [None] * len(chunks)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(embed, c): i for i, c in enumerate(chunks)}
+        futures = {executor.submit(embed, c, req_client): i for i, c in enumerate(chunks)}
         for future in as_completed(futures):
             idx = futures[future]
             results[idx] = future.result()
@@ -213,6 +255,11 @@ def embed_chunks_parallel(chunks: list, max_workers: int = 4) -> list:
 @app.get("/ui")
 def ui():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+
+@app.get("/setup")
+def setup():
+    return FileResponse(os.path.join(STATIC_DIR, "setup.html"))
 
 
 @app.get("/")
@@ -230,6 +277,8 @@ def root():
             {"method": "GET",    "path": "/content/{video_id}", "description": "Get full transcript and all chunks for a video"},
             {"method": "DELETE", "path": "/clear/{video_id}",   "description": "Clear conversation history for a video"},
             {"method": "GET",    "path": "/ui",                 "description": "Web UI"},
+            {"method": "GET",    "path": "/setup",              "description": "Setup guide — Ollama + ngrok"},
+            {"method": "GET",    "path": "/config",             "description": "Get server default config"},
         ]
     }
 
@@ -251,6 +300,7 @@ def load_video(req: LoadRequest):
 
     # Step 1: fetch transcript
     clean = clean_url(req.url)
+    req_client = get_client(req.config)
     transcript, method = fetch_transcript_api(video_id)
     if not transcript:
         print(f"[Load] No captions — trying Whisper...")
@@ -276,7 +326,7 @@ def load_video(req: LoadRequest):
 
     # parallel embed all chunks at once, then batch insert into ChromaDB
     print(f"[Load] Embedding {len(chunks)} chunks in parallel...")
-    embeddings = embed_chunks_parallel(chunks, max_workers=4)
+    embeddings = embed_chunks_parallel(chunks, max_workers=4, req_client=req_client)
     col.add(
         ids       = [f"chunk_{i}" for i in range(len(chunks))],
         embeddings= embeddings,
@@ -319,7 +369,9 @@ def ask_question(req: AskRequest):
         raise HTTPException(status_code=404, detail="Video data not found in store.")
 
     # RAG: retrieve relevant chunks
-    results = col.query(query_embeddings=[embed(req.question)], n_results=req.k)
+    req_client = get_client(req.config)
+    req_model  = get_model(req.config)
+    results = col.query(query_embeddings=[embed(req.question, req_client)], n_results=req.k)
     context = "\n\n---\n\n".join(results["documents"][0])
     title   = loaded_videos[video_id]["title"]
 
@@ -357,8 +409,9 @@ def ask_question(req: AskRequest):
     full_answer = []
 
     def stream():
-        r = client.chat.completions.create(
-            model=MODEL, messages=messages, stream=True, extra_body={"keep_alive": -1}
+        extra = {"keep_alive": -1} if DEPLOY_MODE != "railway" else {}
+        r = req_client.chat.completions.create(
+            model=req_model, messages=messages, stream=True, extra_body=extra
         )
         for chunk in r:
             d = chunk.choices[0].delta

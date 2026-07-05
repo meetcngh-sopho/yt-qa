@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Guide — YouTube Q&A</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 40px 20px; }
+        .container { max-width: 760px; margin: 0 auto; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; }
+        .topbar h1 { font-size: 22px; font-weight: 700; color: #ff4444; }
+        .back { color: #888; font-size: 13px; text-decoration: none; border: 1px solid #333; padding: 6px 14px; border-radius: 6px; }
+        .back:hover { color: #fff; border-color: #555; }
+        h2 { font-size: 18px; font-weight: 600; color: #ccc; margin-bottom: 12px; margin-top: 36px; border-left: 3px solid #ff4444; padding-left: 12px; }
+        p { font-size: 14px; color: #aaa; line-height: 1.8; margin-bottom: 12px; }
+        .step { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+        .step-num { font-size: 11px; color: #ff4444; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+        .step-title { font-size: 15px; font-weight: 600; color: #ddd; margin-bottom: 10px; }
+        pre { background: #111; border: 1px solid #2a2a2a; border-radius: 6px; padding: 14px 16px; font-size: 13px; color: #7ec8e3; overflow-x: auto; margin: 10px 0; font-family: 'Courier New', monospace; }
+        .note { background: #1a1a0a; border: 1px solid #3a3a1a; border-radius: 6px; padding: 12px 16px; font-size: 13px; color: #bba; margin: 10px 0; }
+        .badge { display: inline-block; background: #2a2a2a; color: #888; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin: 2px; }
+        .url-box { background: #111; border: 1px solid #ff4444; border-radius: 6px; padding: 12px 16px; font-size: 13px; color: #ff8888; font-family: monospace; margin: 10px 0; word-break: break-all; }
+        .divider { border: none; border-top: 1px solid #2a2a2a; margin: 40px 0; }
+        a { color: #7ec8e3; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="topbar">
+        <h1>▶ Setup Guide</h1>
+        <a class="back" href="/ui">← Back to App</a>
+    </div>
+
+    <p>This guide shows you how to run a local AI model (Ollama) and expose it to the internet (ngrok) so you can use it with this app from anywhere.</p>
+
+    <!-- OLLAMA SETUP -->
+    <h2>Part 1 — Install Ollama (Local LLM)</h2>
+
+    <div class="step">
+        <div class="step-num">Step 1</div>
+        <div class="step-title">Download and install Ollama</div>
+        <p>Go to <a href="https://ollama.com" target="_blank">ollama.com</a> and download for your OS.</p>
+        <span class="badge">Windows</span> <span class="badge">Mac</span> <span class="badge">Linux</span>
+    </div>
+
+    <div class="step">
+        <div class="step-num">Step 2</div>
+        <div class="step-title">Pull the models</div>
+        <p>Open terminal and run:</p>
+        <pre>ollama pull llama3.2:3b
+ollama pull nomic-embed-text</pre>
+        <p><code>llama3.2:3b</code> is for chat. <code>nomic-embed-text</code> is for embeddings (search).</p>
+    </div>
+
+    <div class="step">
+        <div class="step-num">Step 3</div>
+        <div class="step-title">Verify Ollama is running</div>
+        <pre>curl http://localhost:11434/api/tags</pre>
+        <p>You should see a JSON response with your installed models.</p>
+    </div>
+
+    <div class="step">
+        <div class="step-num">Step 4</div>
+        <div class="step-title">Use in the app (local only)</div>
+        <p>In the app settings panel, set:</p>
+        <div class="url-box">API URL: http://localhost:11434/v1</div>
+        <div class="url-box">API Key: ollama</div>
+        <div class="url-box">Model: llama3.2:3b</div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- NGROK SETUP -->
+    <h2>Part 2 — Expose with ngrok (Access from Internet)</h2>
+
+    <p>By default Ollama only works on your local machine. ngrok creates a public URL that tunnels to your local Ollama — so you can use it from this app even when deployed on Hugging Face.</p>
+
+    <div class="step">
+        <div class="step-num">Step 1</div>
+        <div class="step-title">Install ngrok</div>
+        <p>Go to <a href="https://ngrok.com" target="_blank">ngrok.com</a> → sign up free → download.</p>
+        <p>Or install via terminal:</p>
+        <pre># Mac
+brew install ngrok
+
+# Windows
+winget install ngrok</pre>
+    </div>
+
+    <div class="step">
+        <div class="step-num">Step 2</div>
+        <div class="step-title">Authenticate ngrok</div>
+        <p>After signing up, get your auth token from <a href="https://dashboard.ngrok.com/get-started/your-authtoken" target="_blank">dashboard.ngrok.com</a> and run:</p>
+        <pre>ngrok config add-authtoken YOUR_AUTH_TOKEN</pre>
+    </div>
+
+    <div class="step">
+        <div class="step-num">Step 3</div>
+        <div class="step-title">Start Ollama + expose with ngrok</div>
+        <p>Open two terminals:</p>
+        <p><strong>Terminal 1</strong> — make sure Ollama is running:</p>
+        <pre>ollama serve</pre>
+        <p><strong>Terminal 2</strong> — expose port 11434:</p>
+        <pre>ngrok http 11434</pre>
+    </div>
+
+    <div class="step">
+        <div class="step-num">Step 4</div>
+        <div class="step-title">Copy your ngrok URL</div>
+        <p>ngrok will show something like:</p>
+        <pre>Forwarding  https://abc123.ngrok-free.app -> http://localhost:11434</pre>
+        <p>Copy that <code>https://abc123.ngrok-free.app</code> URL.</p>
+    </div>
+
+    <div class="step">
+        <div class="step-num">Step 5</div>
+        <div class="step-title">Use ngrok URL in the app settings</div>
+        <p>In the app settings panel, set:</p>
+        <div class="url-box">API URL: https://abc123.ngrok-free.app/v1</div>
+        <div class="url-box">API Key: ollama</div>
+        <div class="url-box">Model: llama3.2:3b</div>
+        <div class="note">Note: ngrok free tier URL changes every time you restart ngrok. Update the app settings when it changes.</div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- GROQ -->
+    <h2>Part 3 — Use Groq (Free Cloud API, No Local Setup)</h2>
+
+    <p>If you don't want to run Ollama locally, use Groq — a free cloud API with fast LLMs.</p>
+
+    <div class="step">
+        <div class="step-num">Step 1</div>
+        <div class="step-title">Get a free Groq API key</div>
+        <p>Go to <a href="https://console.groq.com" target="_blank">console.groq.com</a> → sign up → API Keys → Create API Key.</p>
+    </div>
+
+    <div class="step">
+        <div class="step-num">Step 2</div>
+        <div class="step-title">Use Groq in the app settings</div>
+        <div class="url-box">API URL: https://api.groq.com/openai/v1</div>
+        <div class="url-box">API Key: your-groq-api-key</div>
+        <div class="url-box">Model: llama-3.3-70b-versatile</div>
+        <div class="note">Free tier: 100,000 tokens/day — enough for ~166 questions/day.</div>
+    </div>
+
+</div>
+</body>
+</html>
